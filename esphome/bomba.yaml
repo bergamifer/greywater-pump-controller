@@ -1,0 +1,134 @@
+# Controlador de la bomba de aguas grises — ESP32-WROOM-32U + módulo de 4 relés
+# (es lo que había a mano; sólo el canal 1 tiene algo cableado por ahora).
+#
+# Mismo hardware que el equipo de la electroválvula (../ESP32Wroom32U_Electrovalvulas/),
+# pero es OTRA placa física: cada una tiene su nombre, su IP y su clave de API.
+#
+# Pines elegidos (GPIO32, 33, 25, 26): las mismas cuatro patas contiguas del header
+# izquierdo del devkit que se usaron en el otro equipo — sirven de salida, no son
+# pines de arranque (strapping) y no emiten ningún pulso al bootear, a diferencia de
+# GPIO0/2/5/12/14/15, que harían arrancar algo un instante cada vez que se enciende
+# el equipo.
+#
+# QUÉ SIGNIFICA CADA ESTADO (cadena completa, del tablero al canal):
+#
+#   HA dice ENCENDIDO -> GPIOxx en BAJO (rele_invertido=true) -> bobina del relé
+#                        energizada -> contacto COM-NO cerrado -> la carga recibe
+#                        tensión -> ACTIVO
+#   HA dice APAGADO   -> todo lo anterior al revés -> INACTIVO
+#
+# Vale para una carga cableada al contacto NO (normalmente abierto) del relé, que es
+# lo que corresponde: si se corta la alimentación del control, la carga queda parada.
+#
+# ⚠️ POTENCIA: el relé del kit maneja hasta 10 A a 250 V, pero sus borneras y pistas
+# son finitas. Para una bomba de más de ~1/2 HP, o si arranca con golpe de corriente,
+# el relé debe comandar un CONTACTOR y no la bomba directamente.
+#
+# rele_invertido "true" = el módulo de relé se activa con nivel BAJO (lo habitual en
+# los módulos de 4 canales con optoacoplador). Si el relé hace click al revés,
+# cambiar a "false" — es una sola constante para los 4 canales porque son el mismo
+# módulo físico.
+
+substitutions:
+  rele_invertido: "true"
+
+esphome:
+  name: bomba-aguas-grises
+  friendly_name: Bomba aguas grises
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    encryption:
+      key: !secret api_key
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Bomba-Rescate"
+    password: !secret ap_password
+
+captive_portal:
+
+# Interfaz web propia en http://bomba-aguas-grises.local — para probar sin HA.
+web_server:
+  port: 80
+  ota: false
+
+status_led:
+  pin:
+    number: GPIO2
+    inverted: false
+
+# restore_mode ALWAYS_OFF en los 4: después de un corte de luz todo arranca apagado,
+# nada se enciende solo.
+switch:
+  - platform: gpio
+    name: "Bomba"
+    id: rele_bomba
+    pin:
+      number: GPIO32
+      inverted: ${rele_invertido}
+    restore_mode: ALWAYS_OFF
+    icon: mdi:pump
+
+  - platform: gpio
+    name: "Canal 2 (libre)"
+    id: rele_canal_2
+    pin:
+      number: GPIO33
+      inverted: ${rele_invertido}
+    restore_mode: ALWAYS_OFF
+    icon: mdi:electric-switch
+
+  - platform: gpio
+    name: "Canal 3 (libre)"
+    id: rele_canal_3
+    pin:
+      number: GPIO25
+      inverted: ${rele_invertido}
+    restore_mode: ALWAYS_OFF
+    icon: mdi:electric-switch
+
+  - platform: gpio
+    name: "Canal 4 (libre)"
+    id: rele_canal_4
+    pin:
+      number: GPIO26
+      inverted: ${rele_invertido}
+    restore_mode: ALWAYS_OFF
+    icon: mdi:electric-switch
+
+# Lo mismo en palabras, para quien mire el tablero sin conocer el sistema.
+text_sensor:
+  - platform: template
+    name: "Estado de la bomba"
+    icon: mdi:pump
+    lambda: |-
+      return id(rele_bomba).state ? std::string("ENCENDIDA - bombeando")
+                                  : std::string("APAGADA - no bombea");
+    update_interval: 5s
+
+  - platform: wifi_info
+    ip_address:
+      name: "Dirección IP"
+
+button:
+  - platform: restart
+    name: "Reiniciar"
+
+sensor:
+  - platform: wifi_signal
+    name: "Señal WiFi"
+    update_interval: 60s
