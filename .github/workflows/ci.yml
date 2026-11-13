@@ -1,0 +1,33 @@
+name: ESPHome CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  compile:
+    name: Validate and compile firmware
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ESPHome
+        run: pip install esphome
+      - name: Create throw-away secrets
+        working-directory: esphome
+        run: |
+          {
+            echo 'wifi_ssid: "ci"'
+            echo 'wifi_password: "ci-password"'
+            echo "api_key: \"$(openssl rand -base64 32)\""
+            echo 'ap_password: "ci-ap-password"'
+          } > secrets.yaml
+      - name: Validate configuration
+        working-directory: esphome
+        run: esphome config bomba.yaml
+      - name: Compile
+        working-directory: esphome
+        run: esphome compile bomba.yaml

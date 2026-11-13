@@ -82,6 +82,11 @@ switch:
       inverted: ${rele_invertido}
     restore_mode: ALWAYS_OFF
     icon: mdi:pump
+    # Apagado de seguridad: al encender, arranca el temporizador; al apagar, se cancela.
+    on_turn_on:
+      - script.execute: bomba_timeout
+    on_turn_off:
+      - script.stop: bomba_timeout
 
   - platform: gpio
     name: "Canal 2 (libre)"
@@ -132,3 +137,33 @@ sensor:
   - platform: wifi_signal
     name: "Señal WiFi"
     update_interval: 60s
+
+# ---------------------------------------------------------------------------
+# Apagado de seguridad por tiempo (watchdog de marcha)
+# ---------------------------------------------------------------------------
+# La bomba se apaga SOLA al cumplirse el "Tiempo máximo de marcha", pase lo que pase con
+# Home Assistant o el WiFi: el temporizador corre dentro del propio ESP32. Evita trabajar
+# en seco o vaciar de más. El valor se ajusta desde HA y sobrevive a reinicios.
+number:
+  - platform: template
+    name: "Tiempo máximo de marcha"
+    id: max_run_minutes
+    icon: mdi:timer-alert-outline
+    unit_of_measurement: "min"
+    min_value: 1
+    max_value: 120
+    step: 1
+    initial_value: 30
+    restore_value: true
+    optimistic: true
+    mode: box
+
+script:
+  - id: bomba_timeout
+    mode: restart
+    then:
+      - delay: !lambda 'return (uint32_t) (id(max_run_minutes).state * 60000.0f);'
+      - logger.log:
+          level: WARN
+          format: "Tiempo maximo de marcha alcanzado: apagando la bomba"
+      - switch.turn_off: rele_bomba

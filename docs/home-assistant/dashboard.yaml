@@ -1,0 +1,17 @@
+# Example Lovelace card: paste it in a dashboard's raw configuration editor.
+# Entity ids assume the ESPHome device name "bomba-aguas-grises" and the Spanish entity
+# names in esphome/bomba.yaml. Adjust them to what Home Assistant created for your device.
+type: entities
+title: Greywater pump
+show_header_toggle: false
+entities:
+  - entity: switch.bomba_aguas_grises_bomba
+    name: Pump
+  - entity: sensor.bomba_aguas_grises_estado_de_la_bomba
+    name: Status
+  - entity: number.bomba_aguas_grises_tiempo_maximo_de_marcha
+    name: Safety timeout (min)
+  - entity: sensor.bomba_aguas_grises_senal_wifi
+    name: WiFi signal
+  - entity: button.bomba_aguas_grises_reiniciar
+    name: Restart
